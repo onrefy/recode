@@ -1,17 +1,22 @@
 'use strict'
-class Link {
-    constructor(value, status = true, possibleArray = [], choose = null) {
+class Node {
+    constructor(value, status = true, possibleChildren = [], choose = null) {
         this.value = value;
         this.status = status;
-        this.possibleArray = possibleArray;
+        this.possibleChildren = possibleChildren;
         this.choose = choose;
+        this.parent = null;
+    }
+    chooseIndex(index) {
+        this.choose = index;
+        this.possibleChildren[index].parent = this;
     }
     deepestChoose(l) {
         if (l.choose == null) {
             return l;
         } else {
-            let next = this.deepestChoose(l.choose);
-            if (next){
+            let next = this.deepestChoose(l.possibleChildren[l.choose]);
+            if (next) {
                 return next;
             }
         }
@@ -20,13 +25,16 @@ class Link {
 var dotArray = [];
 var bound = [];
 var curves = [];
-var cellSize = 100;
-var xSize = 5,
-    ySize = 5;
-var number = 1;
+var cellSize = 10;
+var xSize = 100,
+    ySize = 100;
+var number = 50;
 
-var lineWidth = 5;
+var lineWidth = 3;
 var dotWidth = 2;
+
+
+
 for (let i = 0; i < xSize; i++) {
     let tempArray = [];
     for (let j = 0; j < ySize; j++) {
@@ -62,58 +70,58 @@ class oneCurve {
             y: startY
         };
         this.directionPassed = [];
-        this.linkMap = new Link(0);
+        var v;
+        if (this.keyPt.x == 0) {
+            v = 0;
+        } else {
+            if (this.keyPt.x == xSize - 1) {
+                v = 6;
+            } else {
+                if (this.keyPt.y == 0) {
+                    v = 3;
+                } else {
+                    if (this.keyPt.y == ySize - 1) {
+                        v = 9;
+                    }
+                }
+            }
+        }
+        this.linkMap = new Node(v);
         this.curveIndex = curves.length;
         while (!this.end) {
-            this.update();
+            this.end = this.update();
         }
         curves.push(this);
     }
     update() {
-        var nextDirection;
-        var preDirection;
+        let nextDirection;
+        let nowDirection;
+        let linkNow = this.linkMap.deepestChoose(this.linkMap);
 
-        if (this.directionPassed.length == 0) {
-            if (this.keyPt.x == 0) {
-                preDirection = 0;
-            } else {
-                if (this.keyPt.x == xSize - 1) {
-                    preDirection = 6;
-                } else {
-                    if (this.keyPt.y == 0) {
-                        preDirection = 3;
-                    } else {
-                        if (this.keyPt.y == ySize - 1) {
-                            preDirection = 9;
-                        }
-                    }
-                }
+        nowDirection = linkNow.value;
+
+        let nextDirectionPossible = this.directionAround(nowDirection);
+        if (!nextDirectionPossible.length) {
+            console.log(1);
+            while (!linkNow.possibleChildren.length) {
+                if (!linkNow.prent) {
+                    return false;
+                } 
+                linkNow.parent.possibleChildren.splice(linkNow.parent.choose, 1);
+                linkNow.parent.choose = null;
+                linkNow = linkNow.parent;
             }
+            nowDirection = linkNow.value;
+            nextDirectionPossible = linkNow.possibleChildren.map((e) => e.value);
         } else {
-            preDirection = this.directionPassed[this.directionPassed.length - 1];
+            nextDirectionPossible.forEach((value) => {
+                linkNow.possibleChildren.push(new Node(value));
+            });
         }
-        this.directionAround(preDirection).forEach((value) => {
-            this.linkMap.deepestChoose(this.linkMap).possibleArray.push(new Link(value));
-        });
 
-        nextDirection = this.directionAround(preDirection)[Math.floor(Math.random() * this.directionAround(preDirection).length)];
-
-
-        let a = this.linkMap.deepestChoose(this.linkMap);
-        a.choose = new Link(3);
-        console.log(this.linkMap);
-
-
-
-
-
-
-        this.directionPassed.push(nextDirection);
-
-
-
-
-
+        let nextIndex = Math.floor(Math.random() * nextDirectionPossible.length);
+        nextDirection = nextDirectionPossible[nextIndex];
+        linkNow.chooseIndex(nextIndex);
 
         this.moveByIndex(this.keyPt, nextDirection);
         dotArray[this.keyPt.x][this.keyPt.y] = true;
@@ -121,9 +129,18 @@ class oneCurve {
         if (this.keyPt.x == 0 || this.keyPt.y == 0 || this.keyPt.x == xSize - 1 || this.keyPt.y == ySize - 1) {
             this.end = true;
         }
+        return true;
     }
 
     render() {
+        let node = this.linkMap.possibleChildren[this.linkMap.choose];
+        this.directionPassed = [];
+        while (node.possibleChildren.length) {
+            this.directionPassed.push(node.value);
+            node = node.possibleChildren[node.choose];
+        }
+        this.directionPassed.push(node.value);
+
         var present = {
             x: this.startPt.x,
             y: this.startPt.y
@@ -210,10 +227,6 @@ class oneCurve {
                         possibleDerections.splice(possibleDerections.indexOf(directionTo[key][i]), 1);
                     }
 
-                }
-                if (possibleDerections.length == 0) {
-                    console.log('dead');
-                    this.end = true;
                 }
                 return (possibleDerections);
             }
