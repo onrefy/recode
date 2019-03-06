@@ -1,4 +1,17 @@
 'use strict'
+var dotArray = [];
+var bound = [];
+var curves = [];
+var cellSize = 7;
+var xSize = 100,
+    ySize = 100;
+var number = 1000;
+
+var lineWidth = 1;
+var dotWidth = 2;
+var dotColor = '#999999';
+var lineColor = '#dddddd';
+var bgColor = '#000000';
 class Node {
     constructor(value, status = true, possibleChildren = [], choose = null) {
         this.value = value;
@@ -9,7 +22,11 @@ class Node {
     }
     chooseIndex(index) {
         this.choose = index;
-        this.possibleChildren[index].parent = this;
+    }
+    bearNewChildren(value) {
+        let child = new Node(value);
+        child.parent = this;
+        this.possibleChildren.push(child);
     }
     deepestChoose(l) {
         if (l.choose == null) {
@@ -22,16 +39,7 @@ class Node {
         }
     }
 }
-var dotArray = [];
-var bound = [];
-var curves = [];
-var cellSize = 10;
-var xSize = 100,
-    ySize = 100;
-var number = 50;
 
-var lineWidth = 3;
-var dotWidth = 2;
 
 
 
@@ -58,7 +66,7 @@ for (let i = 0; i < xSize; i++) {
 }
 
 class oneCurve {
-    end = false;
+    end = true;
     constructor(startX, startY) {
         this.startPt = {
             x: startX,
@@ -88,7 +96,7 @@ class oneCurve {
         }
         this.linkMap = new Node(v);
         this.curveIndex = curves.length;
-        while (!this.end) {
+        while (this.end) {
             this.end = this.update();
         }
         curves.push(this);
@@ -101,12 +109,12 @@ class oneCurve {
         nowDirection = linkNow.value;
 
         let nextDirectionPossible = this.directionAround(nowDirection);
+
         if (!nextDirectionPossible.length) {
-            console.log(1);
-            while (!linkNow.possibleChildren.length) {
-                if (!linkNow.prent) {
+            while (linkNow.possibleChildren.length == 0) {
+                if (!linkNow.parent) {
                     return false;
-                } 
+                }
                 linkNow.parent.possibleChildren.splice(linkNow.parent.choose, 1);
                 linkNow.parent.choose = null;
                 linkNow = linkNow.parent;
@@ -115,7 +123,7 @@ class oneCurve {
             nextDirectionPossible = linkNow.possibleChildren.map((e) => e.value);
         } else {
             nextDirectionPossible.forEach((value) => {
-                linkNow.possibleChildren.push(new Node(value));
+                linkNow.bearNewChildren(value);
             });
         }
 
@@ -123,76 +131,89 @@ class oneCurve {
         nextDirection = nextDirectionPossible[nextIndex];
         linkNow.chooseIndex(nextIndex);
 
-        this.moveByIndex(this.keyPt, nextDirection);
+        //get Key pt
+        let node = this.linkMap.possibleChildren[this.linkMap.choose];
+        this.keyPt.x = this.startPt.x;
+        this.keyPt.y = this.startPt.y;
+        while (node.possibleChildren.length) {
+            this.moveByIndex(this.keyPt, node.value);
+            node = node.possibleChildren[node.choose];
+        }
+        this.moveByIndex(this.keyPt, node.value);
         dotArray[this.keyPt.x][this.keyPt.y] = true;
 
         if (this.keyPt.x == 0 || this.keyPt.y == 0 || this.keyPt.x == xSize - 1 || this.keyPt.y == ySize - 1) {
-            this.end = true;
+            return false;
         }
         return true;
+
     }
 
     render() {
-        let node = this.linkMap.possibleChildren[this.linkMap.choose];
-        this.directionPassed = [];
-        while (node.possibleChildren.length) {
-            this.directionPassed.push(node.value);
-            node = node.possibleChildren[node.choose];
-        }
-        this.directionPassed.push(node.value);
-
-        var present = {
-            x: this.startPt.x,
-            y: this.startPt.y
-        };
-        this.directionPassed.forEach((value) => {
-            var old = {
-                x: present.x,
-                y: present.y
-            };
-            noFill();
-            strokeWeight(lineWidth);
-            strokeCap(SQUARE);
-            this.moveByIndex(present, value);
-            switch (value) {
-                case 0:
-                    line(old.x * cellSize, old.y * cellSize, present.x * cellSize, present.y * cellSize);
-                    break;
-                case 1:
-                    arc((present.x - 1) * cellSize, present.y * cellSize, cellSize * 2, cellSize * 2, -PI / 2, 0);
-                    break;
-                case 2:
-                    arc(present.x * cellSize, old.y * cellSize, cellSize * 2, cellSize * 2, PI / 2, PI);
-                    break;
-                case 3:
-                    line(old.x * cellSize, old.y * cellSize, present.x * cellSize, present.y * cellSize);
-                    break;
-                case 4:
-                    arc(present.x * cellSize, old.y * cellSize, cellSize * 2, cellSize * 2, 0, PI / 2);
-                    break;
-                case 5:
-                    arc(old.x * cellSize, present.y * cellSize, cellSize * 2, cellSize * 2, PI, -PI / 2);
-                    break;
-                case 6:
-                    line(old.x * cellSize, old.y * cellSize, present.x * cellSize, present.y * cellSize);
-                    break;
-                case 7:
-                    arc(old.x * cellSize, present.y * cellSize, cellSize * 2, cellSize * 2, PI / 2, PI);
-                    break;
-                case 8:
-                    arc(present.x * cellSize, old.y * cellSize, cellSize * 2, cellSize * 2, -PI / 2, 0);
-                    break;
-                case 9:
-                    line(old.x * cellSize, old.y * cellSize, present.x * cellSize, present.y * cellSize);
-                    break;
-                case 10:
-                    arc(present.x * cellSize, old.y * cellSize, cellSize * 2, cellSize * 2, PI, -PI / 2);
-                    break;
-                case 11:
-                    arc(old.x * cellSize, present.y * cellSize, cellSize * 2, cellSize * 2, 0, PI / 2);
+        if (this.linkMap.possibleChildren.length !== 0) {
+            let node = this.linkMap.possibleChildren[this.linkMap.choose];
+            this.directionPassed = [];
+            while (node.possibleChildren.length) {
+                this.directionPassed.push(node.value);
+                node = node.possibleChildren[node.choose];
             }
+            this.directionPassed.push(node.value);
 
-        });
+            var present = {
+                x: this.startPt.x,
+                y: this.startPt.y
+            };
+            this.directionPassed.forEach((value) => {
+                var old = {
+                    x: present.x,
+                    y: present.y
+                };
+                noFill();
+                stroke(lineColor);
+                strokeWeight(lineWidth);
+                strokeCap(SQUARE);
+                this.moveByIndex(present, value);
+                switch (value) {
+                    case 0:
+                        line(old.x * cellSize, old.y * cellSize, present.x * cellSize, present.y * cellSize);
+                        break;
+                    case 1:
+                        arc((present.x - 1) * cellSize, present.y * cellSize, cellSize * 2, cellSize * 2, -PI / 2, 0);
+                        break;
+                    case 2:
+                        arc(present.x * cellSize, old.y * cellSize, cellSize * 2, cellSize * 2, PI / 2, PI);
+                        break;
+                    case 3:
+                        line(old.x * cellSize, old.y * cellSize, present.x * cellSize, present.y * cellSize);
+                        break;
+                    case 4:
+                        arc(present.x * cellSize, old.y * cellSize, cellSize * 2, cellSize * 2, 0, PI / 2);
+                        break;
+                    case 5:
+                        arc(old.x * cellSize, present.y * cellSize, cellSize * 2, cellSize * 2, PI, -PI / 2);
+                        break;
+                    case 6:
+                        line(old.x * cellSize, old.y * cellSize, present.x * cellSize, present.y * cellSize);
+                        break;
+                    case 7:
+                        arc(old.x * cellSize, present.y * cellSize, cellSize * 2, cellSize * 2, PI / 2, PI);
+                        break;
+                    case 8:
+                        arc(present.x * cellSize, old.y * cellSize, cellSize * 2, cellSize * 2, -PI / 2, 0);
+                        break;
+                    case 9:
+                        line(old.x * cellSize, old.y * cellSize, present.x * cellSize, present.y * cellSize);
+                        break;
+                    case 10:
+                        arc(present.x * cellSize, old.y * cellSize, cellSize * 2, cellSize * 2, PI, -PI / 2);
+                        break;
+                    case 11:
+                        arc(old.x * cellSize, present.y * cellSize, cellSize * 2, cellSize * 2, 0, PI / 2);
+                }
+
+            });
+        }
+
     }
     directionAround(direction) {
         var directionFrom = {
@@ -216,6 +237,7 @@ class oneCurve {
                         y: this.keyPt.y
                     };
                     this.moveByIndex(tempPosition, directionTo[key][i]);
+
                     if (
                         (
                             (directionTo[key][i] % 3 !== 0) &&
@@ -286,24 +308,39 @@ for (let i = 0; i < number; i++) {
     let temp = new oneCurve(bound[index].x, bound[index].y);
 }
 
-function setup() {
-    createCanvas(window.innerWidth, window.innerHeight);
+function windowResized() {
+    init();
+}
+
+function init() {
+    createCanvas(windowWidth, windowHeight);
+    background(bgColor);
+    let m = Math.min(width, height);
+    cellSize = (Math.floor(height / (ySize + 1)));
+    fill(255);
+    translate(+window.innerWidth / 2 - cellSize * xSize / 2,
+        +window.innerHeight / 2 - cellSize * ySize / 2);
     dotRender();
     curves.forEach((value) => {
         value.render();
     })
 }
 
-function draw() {
-
-}
-
 function dotRender() {
     for (let i = 0; i < xSize; i++) {
         for (let j = 0; j < ySize; j++) {
             strokeWeight(dotWidth);
-            stroke(255, 0, 0);
+            stroke(dotColor);
             point(i * cellSize, j * cellSize);
         }
     }
+}
+
+
+function setup() {
+    init();
+}
+
+function draw() {
+
 }
